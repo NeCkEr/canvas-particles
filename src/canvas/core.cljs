@@ -32,33 +32,55 @@
     (. surface (fill))))
 
 (def particle-dots [0 45 90 135 180 225 270 315])
+(def TO_RADIANS (/ js/Math.PI 180))
 
-(defn draw-particle [[surface] {:keys [x y r points] :as particle}]
-  (. surface (save))
-  (. surface (translate x y))
-  (set! (. surface -fillStyle) (str "#ffffff"))
-  (set! (. surface -lineWidth) 1)
-  (. surface (beginPath))
-  (doseq [[x y] points]
-    (. surface (lineTo x y)))
-  (. surface (closePath))
-  (. surface (stroke))
-  (. surface (restore)))
+(defn draw-particle [[surface] {:keys [x y r] :as particle}]
+  (let [radius (v/vec2 r 0)
+        rotated (->> particle-dots
+                     (map (fn [angle]
+                            (g/rotate radius (* angle TO_RADIANS)))))]
+    (. surface (save))
+    (. surface (translate x y))
+    (set! (. surface -fillStyle) (str "#ffffff"))
+    (set! (. surface -lineWidth) 1)
+    (. surface (beginPath))
+    (doseq [[x y] rotated]
+      (. surface (lineTo x y)))
+    (. surface (closePath))
+    (. surface (stroke))
+    (. surface (restore))))
 
 (defn clear [[surface]]
   (. surface (clearRect 0 0 1200 880)))
 
 (defn move-particle
   [{:keys [x y vel] :as particle}]
-  (let [[vx vy] vel]
-    (-> particle
-      (assoc :x (+ x vx)
-             :y (+ y vy)))))
+  (let [[vx vy] vel
+        movied-particle (-> particle
+                            (assoc :x (+ x vx)
+                                   :y (+ y vy)))]
+    (let [test (cond-> movied-particle
+                       (< (+ (:x movied-particle) (:r movied-particle)) 0)
+                       (assoc :x (+ 1200 (:r movied-particle)))
+
+                       (< 1200 (- (:x movied-particle) (:r movied-particle)))
+                       (assoc :x (- (:r movied-particle)))
+
+                       (< (+ (:y movied-particle) (:r movied-particle)) 0)
+                       (assoc :y (+ 880 (:r movied-particle)))
+
+                       (< 880 (- (:y movied-particle) (:r movied-particle)))
+                       (assoc :y (- (:r movied-particle)))
+                       )]
+      ;(println movied-particle)
+      test)
+
+    ))
 
 (defn update-particles
   [{:keys [particles] :as state}]
-   (let [new-particles-pos (map move-particle particles)]
-     (assoc state :particles new-particles-pos)))
+  (let [new-particles-pos (map move-particle particles)]
+    (assoc state :particles new-particles-pos)))
 
 (defn loop! [surface !state]
   (clear surface)
@@ -72,7 +94,6 @@
     (set! (. canvas -height) height)
     canvas))
 
-(def TO_RADIANS (/ js/Math.PI 180))
 
 (defn ^:export init []
   (let [canvas (init-canvas 1200 880)
@@ -81,20 +102,19 @@
         points (v/vec2 50 0)
         rotated (for [angle particle-dots]
                   (let [[x y] (g/rotate points (* angle TO_RADIANS))]
-                    (println "x:" x " y: " y)
-                    (println "angle:" angle)
+                    ;(println "x:" x " y: " y)
+                    ;(println "angle:" angle)
                     [x y]))
         octagne-points (map (fn [[x y]]
                               [x y]
                               ) rotated)
         particles (take 20 (repeatedly #(hash-map :x (rand-int 1201)
                                                   :y (rand-int 881)
-                                                  :r 50
+                                                  :r (rand-int 51)
                                                   :vel [(rand-nth (range -5 5)) (rand-nth (range -5 5))]
                                                   :points octagne-points)))
         !state (atom {:particles particles})]
-    (println octagne-points)
-    (println angles2)
+    ;(println octagne-points)
 
 
 

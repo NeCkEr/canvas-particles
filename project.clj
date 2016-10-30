@@ -1,0 +1,35 @@
+(defproject canvas-exagon "0.1.0-SNAPSHOT"
+  :dependencies [[org.clojure/clojure "1.8.0"]
+                 [org.clojure/clojurescript "1.9.36"]
+                 [com.taoensso/timbre "4.4.0"]
+                 [reagent "0.6.0-rc"]
+                 [garden "1.3.2"]
+                 [com.cemerick/piggieback "0.2.1"]
+                 [figwheel-sidecar "0.5.4-7"]
+                 [thi.ng/geom "0.0.908"]]
+
+  :source-paths ["src"]
+
+  :plugins [[lein-cljsbuild "1.1.4"]
+            [lein-figwheel "0.5.7"]
+            [lein-garden "0.3.0"]]
+
+  :garden {:builds [{:source-paths ["dev-resources/garden"]
+                     :stylesheet styles/all
+                     :compiler {:output-to "resources/public/css/styles.css"
+                                ;; Compress the output?
+                                :pretty-print? true}}]}
+
+  :clean-targets ^{:protect false} ["resources/public/js/compiled" "target"]
+
+  :figwheel {:css-dirs ["resources/public/css"]
+             :nrepl-port   7888}
+
+  :cljsbuild {:builds [{:id           "dev"
+                        :source-paths ["src"]
+                        :figwheel     {:on-jsload  "canvas.core/reload"}
+                        :compiler     {:main                 canvas.core
+                                       :output-to            "resources/public/js/compiled/app.js"
+                                       :output-dir           "resources/public/js/compiled/out"
+                                       :asset-path           "js/compiled/out"
+                                       :source-map-timestamp true}}]})

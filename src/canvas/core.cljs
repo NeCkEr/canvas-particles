@@ -3,7 +3,8 @@
             [thi.ng.geom.core :as g]
             [goog.Timer :as Timer]
             [goog.events :as events]
-            [goog.dom :as dom]))
+            [goog.dom :as dom]
+            [goog.events.EventType :as event-type]))
 
 (enable-console-print!)
 
@@ -56,30 +57,29 @@
 (defn move-particle
   [{:keys [x y vel] :as particle}]
   (let [[vx vy] vel
-        movied-particle (-> particle
-                            (assoc :x (+ x vx)
-                                   :y (+ y vy)))]
-    (let [test (cond-> movied-particle
-                       (< (+ (:x movied-particle) (:r movied-particle)) 0)
-                       (assoc :x (+ 1200 (:r movied-particle)))
+        moved-particle (-> particle
+                           (assoc :x (+ x vx)
+                                  :y (+ y vy)))]
+    (let [mirror-particle (cond-> moved-particle
+                                  (< (+ (:x moved-particle) (:r moved-particle)) 0)
+                                  (assoc :x (+ 1200 (:r moved-particle)))
 
-                       (< 1200 (- (:x movied-particle) (:r movied-particle)))
-                       (assoc :x (- (:r movied-particle)))
+                                  (< 1200 (- (:x moved-particle) (:r moved-particle)))
+                                  (assoc :x (- (:r moved-particle)))
 
-                       (< (+ (:y movied-particle) (:r movied-particle)) 0)
-                       (assoc :y (+ 880 (:r movied-particle)))
+                                  (< (+ (:y moved-particle) (:r moved-particle)) 0)
+                                  (assoc :y (+ 880 (:r moved-particle)))
 
-                       (< 880 (- (:y movied-particle) (:r movied-particle)))
-                       (assoc :y (- (:r movied-particle)))
-                       )]
-      ;(println movied-particle)
-      test)
-
-    ))
+                                  (< 880 (- (:y moved-particle) (:r moved-particle)))
+                                  (assoc :y (- (:r moved-particle)))
+                                  )]
+      mirror-particle)))
 
 (defn update-particles
   [{:keys [particles] :as state}]
-  (let [new-particles-pos (map move-particle particles)]
+  (let [destoyed-particles (filter (fn [p]
+                                     (= nil (:destroy p))) particles)
+        new-particles-pos (map move-particle destoyed-particles)]
     (assoc state :particles new-particles-pos)))
 
 (defn loop! [surface !state]
@@ -94,6 +94,32 @@
     (set! (. canvas -height) height)
     canvas))
 
+(defn click-canvas [!state e]
+  (let [x (.-clientX e)
+        y (.-clientY e)
+        !duplicate-particle (atom nil)
+        clicked-particles (doall (->> (:particles @!state)
+                                      (map (fn [particle]
+                                             (let [diff-particle {:x (- (:x particle) x)
+                                                                  :y (- (:y particle) y)}
+                                                   distance-squared (+ (* (:x diff-particle) (:x diff-particle)) (* (:y diff-particle) (:y diff-particle)))
+                                                   clicked? (< distance-squared (* (:r particle) (:r particle)))]
+
+                                               (if clicked?
+                                                 (do (if (< (:r particle) 1)
+                                                       (assoc particle :destroy true)
+                                                       (do
+                                                         (reset! !duplicate-particle {:x (:x particle)
+                                                                                      :y (:y particle)
+                                                                                      :r (/ (:r particle) 2)
+                                                                                      :vel [(rand-nth (range -5 5)) (rand-nth (range -5 5))]})
+                                                         (assoc particle :r (/ (:r particle) 2)))))
+                                                 particle))))))]
+    (if @!duplicate-particle
+      (swap! !state assoc :particles (conj clicked-particles @!duplicate-particle))
+      (swap! !state assoc :particles clicked-particles))
+
+    ))
 
 (defn ^:export init []
   (let [canvas (init-canvas 1200 880)
@@ -110,20 +136,14 @@
                               ) rotated)
         particles (take 20 (repeatedly #(hash-map :x (rand-int 1201)
                                                   :y (rand-int 881)
-                                                  :r (rand-int 51)
-                                                  :vel [(rand-nth (range -5 5)) (rand-nth (range -5 5))]
-                                                  :points octagne-points)))
+                                                  :r (rand-nth (range 5 50))
+                                                  :vel [(rand-nth (range -5 5)) (rand-nth (range -5 5))])))
         !state (atom {:particles particles})]
-    ;(println octagne-points)
 
-
-
-    #_(update-canvas (init-round surface) surface)
     (events/listen timer Timer/TICK #(loop! surface !state))
     (.start timer)
 
-    #_(events/listen js/window event-type/CLICK #(click timer state surface %))
-    #_(events/listen js/window event-type/MOUSEMOVE #(mouse-move state surface %))))
+    (events/listen canvas event-type/CLICK #(click-canvas !state %))))
 
 
 (defn ^:export reload []
